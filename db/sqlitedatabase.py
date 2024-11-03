@@ -21,7 +21,6 @@ class Sqlite3Database(Database, ABC):
         try:
             cursor = self.connection.cursor()
             cursor.execute(create_table_sql)
-            print("Table created successfully")
         except Error as e:
             print(f"Error creating table: {e}")
 
@@ -30,7 +29,6 @@ class Sqlite3Database(Database, ABC):
             cursor = self.connection.cursor()
             cursor.execute(insert_sql, data)
             self.connection.commit()
-            print("Data inserted successfully")
         except Error as e:
             print(f"Error inserting data: {e}")
 
@@ -47,4 +45,3 @@ class Sqlite3Database(Database, ABC):
     def close(self):
         if self.connection:
             self.connection.close()
-            print("Connection to SQLite closed")
