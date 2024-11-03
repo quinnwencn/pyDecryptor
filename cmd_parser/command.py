@@ -1,41 +1,41 @@
-import pathlib
+from pathlib import Path
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
-from crypto.decryptor import aes_decrypt
+from crypto.aes_decryptor import aes_decrypt
 from crypto.keystore import read_key, store_key
+from tlv_reader import TLVReader
+from crypto.rsa_decryptor import decrypt_rsa
 
 
 def import_key(key_alias:str, key_file: str, password: str=None):
-    if not pathlib.Path(key_file).exists():
+    key_path = Path(key_file)
+    if not key_path.exists():
         raise Exception("Key file not exists.")
     key = None
     if password is None:
         with open(key_file, 'rb') as fd:
             key = fd.read()
     else:
-        if len(password) != 32:
-            raise Exception(f"password length not valid")
+        encrypted_priv_key = key_path.read_bytes()
+        key = load_pem_private_key(encrypted_priv_key, password.encode("utf-8"))
 
-        with open(key_file, 'rb') as fd:
-            iv = fd.read(16)
-            ciphertext = fd.read()
-
-        key = aes_decrypt(bytes.fromhex(password), ciphertext, iv)
-
-    pathlib.Path(key_file).unlink() # delete key file
+    key_path.unlink() # delete key file
     store_key(key_alias, key)
 
 def decrypt(black_box: str, alias: str):
-    if not pathlib.Path(black_box).exists():
+    if not Path(black_box).exists():
         raise Exception("blackbox not exists.")
 
-    key = read_key(alias)
-    if key is None:
+    rsa_key = read_key(alias)
+    if rsa_key is None:
         raise Exception(f"No key alias named {alias}")
 
-    with open(black_box, "rb") as fd:
-        iv = fd.read(16)
-        ciphertext = fd.read()
+    tlv = TLVReader(black_box)
+    encrypted_key = tlv.get_value_by_type(0x5555)
+    iv = tlv.get_value_by_type(0xaaaa)
+    ciphertext = tlv.get_value_by_type(0x55aa)
 
+    key = decrypt_rsa(rsa_key, encrypted_key)
     plaintext = aes_decrypt(key, ciphertext, iv)
     decrypt_file = black_box + ".decrypt"
     with open(decrypt_file, "wb") as fd:
